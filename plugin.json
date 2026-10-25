@@ -1,0 +1,12 @@
+{
+  "name": "workspace-pulse",
+  "displayName": "Workspace Pulse",
+  "version": "1.0.0",
+  "description": "Live workspace & telemetry dashboard sidecar for Antigravity: system resources, git/AST knowledge graph, and project health in the auxiliary pane and terminal.",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "Show workspace pulse and system health",
+    "Inspect workspace AST symbols and project stats",
+    "Check memory and resource consumption"
+  ]
+}

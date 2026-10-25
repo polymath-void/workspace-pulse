@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Workspace Pulse</title>
+<style>
+  :root {
+    --bg: var(--background, #fafafa);
+    --fg: var(--foreground, #1f2328);
+    --muted: color-mix(in srgb, var(--fg) 55%, transparent);
+    --line: color-mix(in srgb, var(--fg) 14%, transparent);
+    --card: color-mix(in srgb, var(--fg) 4%, transparent);
+    --accent: #4c8dff;
+    --ok: #2ecc71;
+    --warn: #f0b429;
+    --bad: #ef5350;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+  body {
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+    padding: 12px;
+  }
+  header {
+    display: flex; align-items: center; gap: 8px;
+    padding-bottom: 10px; margin-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  h1 { font-size: 14px; font-weight: 600; margin: 0; letter-spacing: .2px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+  .dot.bad { background: var(--bad); box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 22%, transparent); }
+  .grow { flex: 1 1 auto; }
+  .stamp { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  button {
+    font: inherit; font-size: 11px; color: var(--fg);
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 6px; padding: 4px 9px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .tile, section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; padding: 9px 10px;
+  }
+  .label { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  .value { font-size: 16px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .bar { height: 4px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 6px; }
+  .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+  .bar.warn > i { background: var(--warn); }
+  .bar.bad > i { background: var(--bad); }
+  section { margin-top: 8px; }
+  section > h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
+    color: var(--muted); margin: 0 0 8px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .pill {
+    font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 999px;
+    border: 1px solid var(--line); text-transform: none; letter-spacing: 0;
+  }
+  .pill.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+  .pill.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+  .kv { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-variant-numeric: tabular-nums; }
+  .kv > span:first-child { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kv > span:last-child { flex: none; font-weight: 600; }
+  .rows { margin-top: 6px; }
+  .row { padding: 3px 0; }
+  .row .bar { margin-top: 4px; }
+  ul.recent { list-style: none; margin: 4px 0 0; padding: 0; }
+  ul.recent li {
+    display: flex; gap: 8px; align-items: baseline;
+    padding: 3px 0; border-bottom: 1px dashed var(--line); font-size: 12px;
+  }
+  ul.recent li:last-child { border-bottom: 0; }
+  ul.recent code { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  ul.recent em { font-style: normal; font-size: 10px; color: var(--muted); flex: none; }
+  .note { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .note.err { color: var(--bad); }
+  .hidden { display: none; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; word-break: break-all; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="dot"></span>
+  <h1>Workspace Pulse</h1>
+  <span class="grow"></span>
+  <span class="stamp" id="stamp">&mdash;</span>
+  <button id="refresh" title="Re-read local state">Refresh</button>
+</header>
+
+<div class="grid">
+  <div class="tile">
+    <div class="label">Memory</div>
+    <div class="value" id="mem">&mdash;</div>
+    <div class="sub" id="memSub">&nbsp;</div>
+    <div class="bar" id="memBar"><i style="width:0%"></i></div>
+  </div>
+  <div class="tile">
+    <div class="label">Disk ($HOME)</div>
+    <div class="value" id="disk">&mdash;</div>
+    <div class="sub" id="diskSub">&nbsp;</div>
+    <div class="bar" id="diskBar"><i style="width:0%"></i></div>
+  </div>
+  <div class="tile">
+    <div class="label">Load avg</div>
+    <div class="value" id="load">&mdash;</div>
+    <div class="sub" id="loadSub">&nbsp;</div>
+  </div>
+  <div class="tile">
+    <div class="label">Uptime</div>
+    <div class="value" id="uptime">&mdash;</div>
+    <div class="sub" id="uptimeSub">&nbsp;</div>
+  </div>
+</div>
+
+<section>
+  <h2>NodeOS AST graph <span class="pill" id="nodeosPill">checking</span>
+    <span class="grow"></span>
+    <button id="boot" class="hidden">Boot daemon</button>
+  </h2>
+  <div class="kv"><span>Nodes</span><span id="nNodes">&mdash;</span></div>
+  <div class="kv"><span>Edges</span><span id="nEdges">&mdash;</span></div>
+  <div class="kv"><span>DB age</span><span id="nAge">&mdash;</span></div>
+  <div class="kv"><span>Workspace root</span><span class="mono" id="nRoot">&mdash;</span></div>
+  <div class="rows" id="types"></div>
+  <div class="note hidden" id="nodeosNote"></div>
+</section>
+
+<section>
+  <h2>Top projects by symbol count</h2>
+  <div class="rows" id="projects"></div>
+</section>
+
+<section>
+  <h2>Recently indexed</h2>
+  <ul class="recent" id="recent"></ul>
+</section>
+
+<script>
+(function () {
+  "use strict";
+  var TOKEN = new URLSearchParams(location.search).get("token") || "";
+  var REFRESH_MS = 10000;
+  var timer = null;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function fmtMB(mb) {
+    if (mb == null) return "\u2014";
+    return mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : Math.round(mb) + " MB";
+  }
+  function fmtDur(s) {
+    if (s == null) return "\u2014";
+    var d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    if (d > 0) return d + "d " + h + "h";
+    if (h > 0) return h + "h " + m + "m";
+    return m + "m";
+  }
+  function fmtAge(s) {
+    if (s == null) return "\u2014";
+    if (s < 90) return s + "s ago";
+    if (s < 5400) return Math.round(s / 60) + "m ago";
+    if (s < 172800) return Math.round(s / 3600) + "h ago";
+    return Math.round(s / 86400) + "d ago";
+  }
+  function bar(pct) {
+    var cls = pct >= 90 ? "bar bad" : pct >= 75 ? "bar warn" : "bar";
+    return { cls: cls, w: Math.max(0, Math.min(100, pct || 0)) };
+  }
+
+  function renderSystem(s) {
+    var used = s.mem_total_mb != null && s.mem_avail_mb != null
+      ? s.mem_total_mb - s.mem_avail_mb : null;
+    $("mem").textContent = used != null ? fmtMB(used) + " used" : "\u2014";
+    $("memSub").textContent = s.mem_total_mb != null
+      ? fmtMB(s.mem_avail_mb) + " free of " + fmtMB(s.mem_total_mb)
+        + (s.swap_total_mb ? " \u00b7 swap " + fmtMB(s.swap_free_mb) + " free" : "")
+      : "unavailable";
+    var m = bar(s.mem_used_pct || 0);
+    $("memBar").className = m.cls;
+    $("memBar").firstElementChild.style.width = m.w + "%";
+
+    $("disk").textContent = s.disk_free_gb != null ? s.disk_free_gb + " GB free" : "\u2014";
+    $("diskSub").textContent = s.disk_total_gb != null
+      ? "of " + s.disk_total_gb + " GB (" + s.disk_used_pct + "% used)" : "unavailable";
+    var d = bar(s.disk_used_pct || 0);
+    $("diskBar").className = d.cls;
+    $("diskBar").firstElementChild.style.width = d.w + "%";
+
+    $("load").textContent = s.load1 != null
+      ? s.load1 + " " + s.load5 + " " + s.load15 : "n/a";
+    $("loadSub").textContent = s.load1 != null
+      ? "1m / 5m / 15m" : "blocked on this Android build";
+
+    $("uptime").textContent = fmtDur(s.uptime_s);
+    $("uptimeSub").textContent = s.uptime_s != null ? "since boot" : "blocked on this Android build";
+  }
+
+  function renderBars(container, rows, max) {
+    var el = $(container);
+    if (!rows || !rows.length) { el.innerHTML = '<div class="note">no data</div>'; return; }
+    var top = max || rows.reduce(function (a, r) { return Math.max(a, r.value); }, 1);
+    el.innerHTML = rows.map(function (r) {
+      var pct = Math.round((r.value / top) * 100);
+      return '<div class="row"><div class="kv"><span>' + esc(r.label) +
+        '</span><span>' + r.value + '</span></div>' +
+        '<div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+    }).join("");
+  }
+
+  function renderNodeos(n) {
+    var pill = $("nodeosPill");
+    var online = n.online === true;
+    pill.textContent = online ? "daemon online" : (n.online === false ? "daemon offline" : "unknown");
+    pill.className = "pill " + (online ? "ok" : "bad");
+    $("dot").className = "dot " + (online ? "ok" : "bad");
+    $("boot").className = online ? "hidden" : "";
+
+    $("nNodes").textContent = n.nodes != null ? n.nodes.toLocaleString() : "\u2014";
+    $("nEdges").textContent = n.edges != null ? n.edges.toLocaleString() : "\u2014";
+    $("nAge").textContent = fmtAge(n.db_age_s);
+    $("nRoot").textContent = n.workspace_root || "\u2014";
+
+    renderBars("types", (n.node_types || []).map(function (t) {
+      return { label: t.type, value: t.count };
+    }));
+    renderBars("projects", (n.projects || []).map(function (p) {
+      return { label: p.name, value: p.count };
+    }));
+
+    var recent = $("recent");
+    recent.innerHTML = (n.recent && n.recent.length)
+      ? n.recent.map(function (r) {
+          return "<li><code>" + esc(r.name) + "</code><em>" + esc(r.type) + "</em><span class='grow'></span><em>" + esc(r.at) + "</em></li>";
+        }).join("")
+      : '<li class="note">no indexed symbols</li>';
+
+    var note = $("nodeosNote");
+    if (n.error) { note.textContent = n.error; note.className = "note err"; }
+    else { note.className = "note hidden"; }
+  }
+
+  function load() {
+    $("refresh").disabled = true;
+    fetch("api/pulse", { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (data) {
+        renderSystem(data.system || {});
+        renderNodeos(data.nodeos || {});
+        $("stamp").textContent = new Date(data.ts * 1000).toLocaleTimeString();
+      })
+      .catch(function (err) {
+        $("dot").className = "dot bad";
+        $("stamp").textContent = "error: " + err.message;
+      })
+      .finally(function () { $("refresh").disabled = false; });
+  }
+
+  $("refresh").addEventListener("click", load);
+
+  $("boot").addEventListener("click", function () {
+    var btn = $("boot");
+    btn.disabled = true;
+    btn.textContent = "booting\u2026";
+    fetch("api/nodeos/boot" + (TOKEN ? "?token=" + encodeURIComponent(TOKEN) : ""), {
+      method: "POST",
+      headers: TOKEN ? { "X-Sidecar-Token": TOKEN } : {}
+    })
+      .then(function (r) { return r.json(); })
+      .catch(function (e) { return { error: String(e) }; })
+      .then(function (res) {
+        btn.disabled = false;
+        btn.textContent = "Boot daemon";
+        if (res && res.error) { $("stamp").textContent = "boot failed"; }
+        setTimeout(load, 800);
+      });
+  });
+
+  load();
+  timer = setInterval(load, REFRESH_MS);
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) { clearInterval(timer); }
+    else { load(); timer = setInterval(load, REFRESH_MS); }
+  });
+})();
+</script>
+</body>
+</html>

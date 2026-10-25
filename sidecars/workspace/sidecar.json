@@ -1,0 +1,21 @@
+{
+  "command": "python3",
+  "args": ["server.py"],
+  "restart_policy": "always",
+  "display_name": "Workspace Pulse",
+  "description": "Live workspace & telemetry dashboard in the auxiliary pane: system resources, git/AST metrics, and project health.",
+  "has_web_ui": true,
+  "env": {
+    "PYTHONUNBUFFERED": "1"
+  },
+  "ui_config": {
+    "display_name": "Workspace Pulse",
+    "views": [
+      {
+        "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE",
+        "path": "/auxpane",
+        "title": "Workspace Pulse"
+      }
+    ]
+  }
+}
